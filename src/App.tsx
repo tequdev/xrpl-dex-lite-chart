@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
-import { createChart, CrosshairMode, UTCTimestamp } from 'lightweight-charts';
-import { StackedBarsSeries } from './plugins/stacked-bars-series/stacked-bars-series'
+
+import 'zingchart/es6';
+import ZingChart from 'zingchart-react';
 
 type ChartType = 'AMM' | 'CLOB' | 'DEVIATION'
 
@@ -17,10 +18,10 @@ type MarketData = {
 }
 
 function App() {
-  const chartRef = useRef(null);
   const [chartType, setChartType] = useState<ChartType>('CLOB')
   const [ammData, setAmmData] = useState<MarketData[]>([])
   const [clobData, setClobData] = useState<MarketData[]>([])
+  const [chartData, setChartData] = useState<any>({})
 
   useEffect(() => {
     const fetchChartData = async () => {
@@ -41,53 +42,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if(!ammData.length || !clobData.length) return
-    if (!chartRef.current) return
-    (chartRef.current as any).innerHTML = '';
-    const chart = createChart(chartRef.current, {
-      width: 800,
-      height: 600,
-      rightPriceScale: {
-        visible: true,
-      },
-      leftPriceScale: {
-        visible: true,
-        borderVisible: false,
-      },
-      layout: {
-        background: {
-          color: '#ffffff',
-        },
-        textColor: 'rgba(33, 56, 77, 1)',
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-      },
-      grid: {
-        vertLines: {
-          color: 'rgba(197, 203, 206, 0.5)',
-        },
-        horzLines: {
-          color: 'rgba(197, 203, 206, 0.5)',
-        },
-      },
-    });
-
-
-    const candlestickSeries = chart.addCandlestickSeries({
-      priceScaleId: 'right',
-    });
-    const stackedbarSeries = chart.addCustomSeries(new StackedBarsSeries(), {
-      priceScaleId: 'left',
-      autoscaleInfoProvider: (original: any) => {
-        const res = original();
-        if (res !== null) {
-          res.priceRange.minValue = 0;
-          res.priceRange.maxValue *= 5;
-        }
-        return res;
-      }
-    })
+    if (!ammData.length || !clobData.length) return
 
     const getValueByType = (amm: number, clob: number) => {
       if (chartType === 'AMM') {
@@ -102,34 +57,95 @@ function App() {
       throw new Error('Invalid chart type');
     }
 
-    {
-      const data = ammData.map(item => {
-        console.log(item);
-        const timestamp = new Date(item.timestamp).getTime() / 1000; // UNIXタイムスタンプに変換
-        const clob = clobData.find(d => d.timestamp === item.timestamp)!;
-        return {
-          time: timestamp as UTCTimestamp,
-          open: getValueByType(item.open, clob.open),
-          high: getValueByType(item.high, clob.high),
-          low: getValueByType(item.low, clob.low),
-          close: getValueByType(item.close, clob.close),
-        };
-      });
-      candlestickSeries.setData(data);
-    }
+    const ohlct = ammData.map(item => {
+      console.log(item);
+      const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
+      const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+      return {
+        time: timestamp,
+        open: getValueByType(item.open, clob.open),
+        high: getValueByType(item.high, clob.high),
+        low: getValueByType(item.low, clob.low),
+        close: getValueByType(item.close, clob.close),
+      };
+    });
 
-    {
-      const data = ammData.map(item => {
-        console.log(item);
-        const timestamp = new Date(item.timestamp).getTime() / 1000; // UNIXタイムスタンプに変換
-        const clob = clobData.find(d => d.timestamp === item.timestamp)!;
-        return {
-          time: timestamp as UTCTimestamp,
-          values: [item.base_volume, clob.base_volume],
-        };
-      });
-      stackedbarSeries.setData(data);
-    }
+    const volume = ammData.map(item => {
+      console.log(item);
+      const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
+      const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+      return {
+        time: timestamp,
+        values: [item.base_volume, clob.base_volume],
+      };
+    });
+
+    setChartData({
+      type: "mixed",
+      'scale-y': { //for Stock Chart
+        'offset-start': "25%", //to adjust scale offsets.
+        'min-value': Math.min(...ohlct.flatMap(item => [item.open, item.close])),
+        'max-value': Math.max(...ohlct.flatMap(item => [item.open, item.close])),
+      },
+      'scale-y-2': { //for Volume Chart
+        placement: "default", //to move scale to default (left) side.
+        blended: true, //to bind the scale to "scale-y".
+        'offset-end': "75%", //to adjust scale offsets.
+      },
+      'scale-x': { /* Scale object, set up to display as a time-series scale. Read our Time-Series Scale section further below for more information. */
+        step: "6hour",
+        'min-value': Math.min(...ohlct.map(item => item.time)),
+        item: {
+          fontSize: '10px',
+        },
+        transform: {
+          type: "date",
+          all: "%M %d, %Y"
+        },
+      },
+      utc: true, /* Set to UTC time. */
+      plot: {
+        aspect: 'candlestick',
+        groupBars: false, // defaults to true
+        barWidth: 8,
+        stacked: true,
+        'trend-down': { //Stock Gain
+          'background-color': "#FF453A",
+          'line-color': "#FF453A",
+          'border-color': "#FF453A"
+        },
+        'trend-up': { //Stock Loss
+          'background-color': "#30D158",
+          'line-color': "#30D158",
+          'border-color': "#30D158"
+        },
+      },
+      series: [
+        {
+          type: "stock", //Stock Chart
+          scales: "scale-x,scale-y", //to set applicable scales.
+          values: ohlct.map((item) => {
+            return [item.time, [item.open, item.high, item.low, item.close]];
+          })
+        },
+        {
+          type: 'bar', //Volume Chart
+          scales: "scale-x,scale-y-2", //to set applicable scales.
+          stack: 1,
+          values: volume.map((item) => {
+            return [item.time, item.values[0]];
+          })
+        },
+        {
+          type: 'bar', //Volume Chart
+          scales: "scale-x,scale-y-2", //to set applicable scales.
+          stack: 1,
+          values: volume.map((item) => {
+            return [item.time, item.values[1]];
+          })
+        }
+      ]
+    })
   }, [ammData, chartType, clobData])
 
   return (
@@ -141,7 +157,8 @@ function App() {
         <option value="CLOB">CLOB</option>
         <option value="DEVIATION">DEVIATION</option>
       </select>
-      <div ref={chartRef} style={{ width: '800px', height: '600px', marginBottom: '20px' }} />
+
+      {chartData && <ZingChart width={1200} height={600} data={chartData} />}
     </>
   )
 }
