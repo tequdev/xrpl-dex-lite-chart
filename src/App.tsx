@@ -3,8 +3,9 @@ import './App.css'
 
 import 'zingchart/es6';
 import ZingChart from 'zingchart-react';
+import 'zingchart/modules-es6/zingchart-depth.min.js';
 
-type ChartType = 'AMM' | 'CLOB' | 'DEVIATION'
+type ChartType = 'ALL' | 'AMM' | 'CLOB'
 
 type MarketData = {
   timestamp: string;
@@ -18,65 +19,81 @@ type MarketData = {
 }
 
 function App() {
+  const [pair, setPair] = useState<Record<'base' | 'counter', string>>()
   const [chartType, setChartType] = useState<ChartType>('CLOB')
   const [ammData, setAmmData] = useState<MarketData[]>([])
   const [clobData, setClobData] = useState<MarketData[]>([])
+  const [allData, setAllData] = useState<MarketData[]>([])
+
   const [chartData, setChartData] = useState<any>({})
 
   useEffect(() => {
+    const base = 'XRP'
+    const counter = 'rcEGREd8NmkKRE8GE424sksyt1tJVFZwu_5553444300000000000000000000000000000000'
+    // const counter = 'rsoLo2S1kiGeCcn6hCUXVrCpGMWLrRrLZz_534F4C4F00000000000000000000000000000000'
+    // const base = 'rchGBxcD1A1C2tdxF6papQYZ8kjRKMYcL_BTC'
+    // const base = 'rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B_USD'
+    // const counter = 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq_USD'
+    // const counter = 'rsxkrpsYaeTUdciSFJwvto7MKSrgGnvYvA_5A52505900000000000000000000000000000000'
+
+    setPair({
+      base,
+      counter,
+    })
+  }, [])
+
+  useEffect(() => {
     const fetchChartData = async () => {
-      const base = 'XRP'
-      const counter = 'rcEGREd8NmkKRE8GE424sksyt1tJVFZwu_5553444300000000000000000000000000000000'
-      // const base = 'rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B_USD'
-      // const counter = 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq_USD'
+      if (!pair) return
+      const { base, counter } = pair
 
       const responseAMM = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true&only_amm=true`);
       const responseCLOB = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true&exclude_amm=true`);
+      const responseALL = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true`);
 
       const ammjson = (await responseAMM.json()).reverse();
       const clobjson = (await responseCLOB.json()).reverse();
+      const alljson = (await responseALL.json()).reverse();
       setAmmData(ammjson)
       setClobData(clobjson)
+      setAllData(alljson)
     }
     fetchChartData()
-  }, [])
+  }, [pair])
 
   useEffect(() => {
     if (!ammData.length || !clobData.length) return
 
-    const getValueByType = (amm: number, clob: number) => {
-      if (chartType === 'AMM') {
-        return amm;
-      }
-      if (chartType === 'CLOB') {
-        return clob;
-      }
-      if (chartType === 'DEVIATION') {
-        return amm / clob;
-      }
-      throw new Error('Invalid chart type');
-    }
-
     const ohlct = ammData.map(item => {
-      console.log(item);
       const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
-      const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+      const data = (chartType === 'ALL' ? allData : chartType === 'AMM' ? ammData : clobData).find(d => d.timestamp === item.timestamp)!;
       return {
         time: timestamp,
-        open: getValueByType(item.open, clob.open),
-        high: getValueByType(item.high, clob.high),
-        low: getValueByType(item.low, clob.low),
-        close: getValueByType(item.close, clob.close),
+        open: data.open,
+        high: data.high,
+        low: data.low,
+        close: data.close,
       };
     });
 
     const volume = ammData.map(item => {
-      console.log(item);
       const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
       const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+      let values: number[] = []
+
+      if (chartType === 'ALL') {
+        values = [item.base_volume, clob.base_volume]
+      }
+      if (chartType === 'AMM') {
+        values = [item.base_volume]
+      }
+      if (chartType === 'CLOB') {
+        values = [clob.base_volume]
+      }
+
       return {
         time: timestamp,
-        values: [item.base_volume, clob.base_volume],
+        values,
       };
     });
 
@@ -146,19 +163,18 @@ function App() {
         }
       ]
     })
-  }, [ammData, chartType, clobData])
+  }, [allData, ammData, chartType, clobData])
 
   return (
     <>
       <h1 style={{ color: 'red' }}>XRP AMM/CLOB Chart</h1>
-      <h2>{chartType}</h2>
+      <h2>{pair?.counter}/{pair?.base}</h2>
       <select value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
+        <option value="ALL">ALL</option>
         <option value="AMM">AMM</option>
         <option value="CLOB">CLOB</option>
-        <option value="DEVIATION">DEVIATION</option>
       </select>
-
-      {chartData && <ZingChart width={1200} height={600} data={chartData} />}
+      {chartData && <ZingChart id="chart" width={1280} height={600} data={chartData} />}
     </>
   )
 }

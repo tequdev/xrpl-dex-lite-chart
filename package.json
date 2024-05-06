@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "bignumber.js": "^9.1.2",
+    "decimal.js": "^10.4.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "xrpl": "^3.0.0",
     "zingchart": "^2.9.13",
     "zingchart-react": "^3.2.0"
   },
