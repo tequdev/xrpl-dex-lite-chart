@@ -19,6 +19,7 @@ type MarketData = {
   exchanges: number
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getAssetName = (AssetName: any, Asset: any) => {
   if (AssetName?.name) return AssetName.name
   if (AssetName?.username) return `${AssetName.username} ${Asset.currency}`
@@ -26,6 +27,7 @@ const getAssetName = (AssetName: any, Asset: any) => {
 }
 
 function App() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pools, setPools] = useState<any[]>([])
   const [selectedPool, setSelectedPool] = useState<number>(0)
   const [pair, setPair] = useState<Record<'base' | 'counter', string> & Record<'baseInfo' | 'counterInfo', { name: string }>>()
