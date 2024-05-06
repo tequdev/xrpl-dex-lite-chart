@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 
 import 'zingchart/es6';
 import ZingChart from 'zingchart-react';
 import 'zingchart/modules-es6/zingchart-depth.min.js';
+import { Currency } from 'xrpl';
 
 type ChartType = 'ALL' | 'AMM' | 'CLOB'
 
@@ -18,9 +19,17 @@ type MarketData = {
   exchanges: number
 }
 
+const getAssetName = (AssetName: any, Asset: any) => {
+            if (AssetName?.name) return AssetName.name
+            if (AssetName?.username) return `${AssetName.username} ${Asset.currency}`
+            return 'XRP'
+          }
+
 function App() {
-  const [pair, setPair] = useState<Record<'base' | 'counter', string>>()
-  const [chartType, setChartType] = useState<ChartType>('CLOB')
+  const [pools, setPools] = useState<any[]>([])
+  const [selectedPool, setSelectedPool] = useState<number>(0)
+  const [pair, setPair] = useState<Record<'base' | 'counter', string> & Record<'baseInfo' | 'counterInfo', { name: string }>>()
+  const [chartType, setChartType] = useState<ChartType>('ALL')
   const [ammData, setAmmData] = useState<MarketData[]>([])
   const [clobData, setClobData] = useState<MarketData[]>([])
   const [allData, setAllData] = useState<MarketData[]>([])
@@ -28,19 +37,41 @@ function App() {
   const [chartData, setChartData] = useState<any>({})
 
   useEffect(() => {
-    const base = 'XRP'
-    const counter = 'rcEGREd8NmkKRE8GE424sksyt1tJVFZwu_5553444300000000000000000000000000000000'
-    // const counter = 'rsoLo2S1kiGeCcn6hCUXVrCpGMWLrRrLZz_534F4C4F00000000000000000000000000000000'
-    // const base = 'rchGBxcD1A1C2tdxF6papQYZ8kjRKMYcL_BTC'
-    // const base = 'rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B_USD'
-    // const counter = 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq_USD'
-    // const counter = 'rsxkrpsYaeTUdciSFJwvto7MKSrgGnvYvA_5A52505900000000000000000000000000000000'
+    const f = async () => {
+      const response = await fetch('https://api.xrpscan.com/api/v1/amm/pools')
+      const data = await response.json()
+      const p = data.filter((d) => (!d.Asset.issuer || d.AssetName) && (!d.Asset2.issuer || d.Asset2Name))
+      console.log(p)
+      setPools(p)
+    }
+    f()
+  }, [])
+
+  const selectPairFromPool = useCallback((index: number) => {
+    if (pools.length === 0) return
+    const assetToApiAsset = (asset: Currency) => {
+      if (asset.currency === 'XRP')
+        return 'XRP'
+      return `${asset.issuer}_${asset.currency}`
+    }
+    const top = pools[index]
+    const base = assetToApiAsset(top.Asset)
+    const baseInfo = { name: getAssetName(top.AssetName, top.Asset) }
+    const counter = assetToApiAsset(top.Asset2)
+    const counterInfo = { name: getAssetName(top.Asset2Name, top.Asset2) }
 
     setPair({
       base,
       counter,
+      baseInfo,
+      counterInfo
     })
-  }, [])
+  }, [pools])
+
+  useEffect(() => {
+    if (pools.length === 0) return
+    selectPairFromPool(selectedPool)
+  }, [pools, selectPairFromPool, selectedPool])
 
   useEffect(() => {
     const fetchChartData = async () => {
@@ -85,10 +116,10 @@ function App() {
         values = [item.base_volume, clob.base_volume]
       }
       if (chartType === 'AMM') {
-        values = [item.base_volume]
+        values = [item.base_volume, 0]
       }
       if (chartType === 'CLOB') {
-        values = [clob.base_volume]
+        values = [0, clob.base_volume]
       }
 
       return {
@@ -168,7 +199,15 @@ function App() {
   return (
     <>
       <h1 style={{ color: 'red' }}>XRP AMM/CLOB Chart</h1>
-      <h2>{pair?.counter}/{pair?.base}</h2>
+      <h2>{pair?.counterInfo.name}/{pair?.baseInfo.name}</h2>
+      <select value={selectedPool.toString()} onChange={(e) => setSelectedPool(parseInt(e.target.value))}>
+        {pools.map((pool, index) => {
+          const counter = getAssetName(pool.Asset2Name, pool.Asset2)
+          const base = getAssetName(pool.AssetName, pool.Asset)
+          return <option key={pool.index} value={index}>{counter}/{base}</option>
+        }
+        )}
+      </select>
       <select value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
         <option value="ALL">ALL</option>
         <option value="AMM">AMM</option>
