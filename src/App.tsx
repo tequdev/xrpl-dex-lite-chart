@@ -20,10 +20,10 @@ type MarketData = {
 }
 
 const getAssetName = (AssetName: any, Asset: any) => {
-            if (AssetName?.name) return AssetName.name
-            if (AssetName?.username) return `${AssetName.username} ${Asset.currency}`
-            return 'XRP'
-          }
+  if (AssetName?.name) return AssetName.name
+  if (AssetName?.username) return `${AssetName.username} ${Asset.currency}`
+  return 'XRP'
+}
 
 function App() {
   const [pools, setPools] = useState<any[]>([])
@@ -198,7 +198,7 @@ function App() {
 
   return (
     <>
-      <h1 style={{ color: 'red' }}>XRP AMM/CLOB Chart</h1>
+      <h1 style={{ color: 'red' }}>XRPL AMM/CLOB Chart</h1>
       <h2>{pair?.counterInfo.name}/{pair?.baseInfo.name}</h2>
       <select value={selectedPool.toString()} onChange={(e) => setSelectedPool(parseInt(e.target.value))}>
         {pools.map((pool, index) => {
