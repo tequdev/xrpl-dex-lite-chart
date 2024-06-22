@@ -27,7 +27,7 @@ const getAssetName = (AssetName: any, Asset: any) => {
 }
 
 function App() {
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pools, setPools] = useState<any[]>([])
   const [selectedPool, setSelectedPool] = useState<number>(0)
   const [pair, setPair] = useState<Record<'base' | 'counter', string> & Record<'baseInfo' | 'counterInfo', { name: string }>>()
@@ -36,7 +36,7 @@ function App() {
   const [clobData, setClobData] = useState<MarketData[]>([])
   const [allData, setAllData] = useState<MarketData[]>([])
 
-  const [chartData, setChartData] = useState<any>({})
+  const [chartData, setChartData] = useState<any>()
 
   useEffect(() => {
     const f = async () => {
@@ -78,6 +78,7 @@ function App() {
   useEffect(() => {
     const fetchChartData = async () => {
       if (!pair) return
+      setChartData(undefined)
       const { base, counter } = pair
 
       const responseAMM = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true&only_amm=true`);
@@ -200,9 +201,8 @@ function App() {
 
   return (
     <>
-      <h1 style={{ color: 'red' }}>XRPL AMM/CLOB Chart</h1>
-      <h2>{pair?.counterInfo.name}/{pair?.baseInfo.name}</h2>
-      <select value={selectedPool.toString()} onChange={(e) => setSelectedPool(parseInt(e.target.value))}>
+      <h1 className='text-4xl font-semibold my-12'>XRPL AMM/CLOB Chart</h1>
+      <select className='select select-bordered max-w-xs text-xl' value={selectedPool.toString()} onChange={(e) => setSelectedPool(parseInt(e.target.value))}>
         {pools.map((pool, index) => {
           const counter = getAssetName(pool.Asset2Name, pool.Asset2)
           const base = getAssetName(pool.AssetName, pool.Asset)
@@ -210,12 +210,18 @@ function App() {
         }
         )}
       </select>
-      <select value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
+      <select className='select select-bordered max-w-xs text-xl' value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
         <option value="ALL">ALL</option>
         <option value="AMM">AMM</option>
         <option value="CLOB">CLOB</option>
       </select>
-      {chartData && <ZingChart id="chart" width={1280} height={600} data={chartData} />}
+      {
+        chartData ?
+          <ZingChart id="chart" width={1280} height={600} data={chartData} /> :
+          <div className='w-[1280px] h-[600px] flex align-center justify-center'>
+            <span className="loading loading-bars loading-lg" />
+          </div>
+      }
     </>
   )
 }
