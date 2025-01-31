@@ -133,18 +133,22 @@ function App() {
 
     setChartData({
       type: "mixed",
+      preview: {},
       'scale-y': { //for Stock Chart
+        zooming: true,
         'offset-start': "25%", //to adjust scale offsets.
         'min-value': Math.min(...ohlct.flatMap(item => [item.open, item.close])),
         'max-value': Math.max(...ohlct.flatMap(item => [item.open, item.close])),
       },
       'scale-y-2': { //for Volume Chart
+        zooming: true,
         placement: "default", //to move scale to default (left) side.
         blended: true, //to bind the scale to "scale-y".
         'offset-end': "75%", //to adjust scale offsets.
       },
       'scale-x': { /* Scale object, set up to display as a time-series scale. Read our Time-Series Scale section further below for more information. */
         step: "6hour",
+        zooming: true,
         'min-value': Math.min(...ohlct.map(item => item.time)),
         item: {
           fontSize: '10px',
