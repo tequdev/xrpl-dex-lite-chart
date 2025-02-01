@@ -8,7 +8,7 @@ import { StackedBarsData } from './plugins/stacked-bars-series/data';
 // import { TooltipPrimitive } from './plugins/tooltip/tooltip';
 
 type ChartType = 'ALL' | 'AMM' | 'CLOB'
-type IntervalType = '1d' | '12h' | '8h' | '4h' | '1h' | '30m' | '15m'
+type IntervalType = '1d' | '12h' | '8h' | '4h' | '1h' | '30m' | '15m' | '5m' | '1m'
 
 type MarketData = {
   timestamp: string;
@@ -302,13 +302,9 @@ function App() {
           <option value="CLOB">CLOB</option>
         </select>
         <select className='select select-bordered max-w-xs text-xl' value={interval} onChange={(e) => setInterval(e.target.value as IntervalType)}>
-          <option value="1d">1d</option>
-          <option value="12h">12h</option>
-          <option value="8h">8h</option>
-          <option value="4h">4h</option>
-          <option value="1h">1h</option>
-          <option value="30m">30m</option>
-          <option value="15m">15m</option>
+          {['1d', '8h', '3h', '1h', '15m', '5m', '1m'].map((interval) => (
+            <option key={interval} value={interval}>{interval}</option>
+          ))}
         </select>
       </div>
       {
