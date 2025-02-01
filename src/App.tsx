@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import './App.css'
 
-import 'zingchart/es6';
-import ZingChart from 'zingchart-react';
-import 'zingchart/modules-es6/zingchart-depth.min.js';
+import { CandlestickSeries, createChart, UTCTimestamp } from 'lightweight-charts';
 import { Currency } from 'xrpl';
+import { StackedBarsSeries } from './plugins/stacked-bars-series/stacked-bars-series';
+import { StackedBarsData } from './plugins/stacked-bars-series/data';
+// import { TooltipPrimitive } from './plugins/tooltip/tooltip';
 
 type ChartType = 'ALL' | 'AMM' | 'CLOB'
 
@@ -29,6 +30,7 @@ const getAssetName = (AssetName: any, Asset: any) => {
 function App() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pools, setPools] = useState<any[]>([])
+  const [loading, setLoading] = useState<boolean>(false)
   const [selectedPool, setSelectedPool] = useState<number>(0)
   const [pair, setPair] = useState<Record<'base' | 'counter', string> & Record<'baseInfo' | 'counterInfo', { name: string }>>()
   const [chartType, setChartType] = useState<ChartType>('ALL')
@@ -36,7 +38,7 @@ function App() {
   const [clobData, setClobData] = useState<MarketData[]>([])
   const [allData, setAllData] = useState<MarketData[]>([])
 
-  const [chartData, setChartData] = useState<any>()
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const f = async () => {
@@ -78,9 +80,8 @@ function App() {
   useEffect(() => {
     const fetchChartData = async () => {
       if (!pair) return
-      setChartData(undefined)
       const { base, counter } = pair
-
+      setLoading(true)
       const responseAMM = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true&only_amm=true`);
       const responseCLOB = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true&exclude_amm=true`);
       const responseALL = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=8h&limit=321&descending=true`);
@@ -91,18 +92,23 @@ function App() {
       setAmmData(ammjson)
       setClobData(clobjson)
       setAllData(alljson)
+      setLoading(false)
     }
     fetchChartData()
   }, [pair])
 
   useEffect(() => {
-    if (!ammData.length || !clobData.length) return
+    if (!ammData.length || !clobData.length || !chartContainerRef.current) return
 
-    const ohlct = ammData.map(item => {
-      const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
-      const data = (chartType === 'ALL' ? allData : chartType === 'AMM' ? ammData : clobData).find(d => d.timestamp === item.timestamp)!;
+    const ohlc = ammData.map((item) => {
+      const timeSeconds = Math.floor(new Date(item.timestamp).getTime() / 1000);
+      const data = (chartType === 'ALL' ? allData : chartType === 'AMM' ? ammData : clobData)
+        .find(d => d.timestamp === item.timestamp)!;
+      console.log('timeSeconds', timeSeconds
+
+      )
       return {
-        time: timestamp,
+        time: timeSeconds as UTCTimestamp,
         open: data.open,
         high: data.high,
         low: data.low,
@@ -110,98 +116,94 @@ function App() {
       };
     });
 
-    const volume = ammData.map(item => {
-      const timestamp = new Date(item.timestamp).getTime() // / 1000; // UNIXタイムスタンプに変換
-      const clob = clobData.find(d => d.timestamp === item.timestamp)!;
-      let values: number[] = []
-
-      if (chartType === 'ALL') {
-        values = [item.base_volume, clob.base_volume]
+    const volumeData1 = ammData.map((item) => {
+      const timeSeconds = Math.floor(new Date(item.timestamp).getTime() / 1000);
+      let value = 0;
+      if (chartType === 'ALL' || chartType === 'AMM') {
+        value = item.base_volume;
       }
-      if (chartType === 'AMM') {
-        values = [item.base_volume, 0]
-      }
-      if (chartType === 'CLOB') {
-        values = [0, clob.base_volume]
-      }
-
       return {
-        time: timestamp,
-        values,
+        time: timeSeconds as UTCTimestamp,
+        value,
+        color: '#26a69a',
+      };
+    });
+    const volumeData2 = ammData.map((item) => {
+      const timeSeconds = Math.floor(new Date(item.timestamp).getTime() / 1000);
+      let value = 0;
+      if (chartType === 'ALL' || chartType === 'CLOB') {
+        const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+        value = clob.base_volume;
+      }
+      return {
+        time: timeSeconds as UTCTimestamp,
+        value,
+        color: '#ff0000',
       };
     });
 
-    setChartData({
-      type: "mixed",
-      preview: {},
-      'scale-y': { //for Stock Chart
-        zooming: true,
-        'offset-start': "25%", //to adjust scale offsets.
-        'min-value': Math.min(...ohlct.flatMap(item => [item.open, item.close])),
-        'max-value': Math.max(...ohlct.flatMap(item => [item.open, item.close])),
+    chartContainerRef.current.innerHTML = '';
+
+    const chart = createChart(chartContainerRef.current, {
+      autoSize: true,
+      // width: 1280,
+      // height: 600,
+      layout: {
+        background: {
+          color: '#ffffff',
+        },
+        textColor: '#000'
       },
-      'scale-y-2': { //for Volume Chart
-        zooming: true,
-        placement: "default", //to move scale to default (left) side.
-        blended: true, //to bind the scale to "scale-y".
-        'offset-end': "75%", //to adjust scale offsets.
+      timeScale: {
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        timeVisible: true,
+        secondsVisible: false,
       },
-      'scale-x': { /* Scale object, set up to display as a time-series scale. Read our Time-Series Scale section further below for more information. */
-        step: "6hour",
-        zooming: true,
-        'min-value': Math.min(...ohlct.map(item => item.time)),
-        item: {
-          fontSize: '10px',
-        },
-        transform: {
-          type: "date",
-          all: "%M %d, %Y"
-        },
+    });
+
+    chart.applyOptions({
+      localization: {
+        dateFormat: 'dd MMM \'yy'
       },
-      utc: true, /* Set to UTC time. */
-      plot: {
-        aspect: 'candlestick',
-        groupBars: false, // defaults to true
-        barWidth: 8,
-        stacked: true,
-        'trend-down': { //Stock Gain
-          'background-color': "#FF453A",
-          'line-color': "#FF453A",
-          'border-color': "#FF453A"
-        },
-        'trend-up': { //Stock Loss
-          'background-color': "#30D158",
-          'line-color': "#30D158",
-          'border-color': "#30D158"
-        },
+    });
+    chart.applyOptions({
+      localization: {
+        locale: 'ja-JP',
+        dateFormat: 'yyyy-MM-dd',
       },
-      series: [
-        {
-          type: "stock", //Stock Chart
-          scales: "scale-x,scale-y", //to set applicable scales.
-          values: ohlct.map((item) => {
-            return [item.time, [item.open, item.high, item.low, item.close]];
-          })
-        },
-        {
-          type: 'bar', //Volume Chart
-          scales: "scale-x,scale-y-2", //to set applicable scales.
-          stack: 1,
-          values: volume.map((item) => {
-            return [item.time, item.values[0]];
-          })
-        },
-        {
-          type: 'bar', //Volume Chart
-          scales: "scale-x,scale-y-2", //to set applicable scales.
-          stack: 1,
-          values: volume.map((item) => {
-            return [item.time, item.values[1]];
-          })
-        }
-      ]
+    });
+
+    const candleSeries = chart.addSeries(CandlestickSeries)
+    candleSeries.setData(ohlc);
+
+    // const tooltipPrimitive = new TooltipPrimitive({
+    //   lineColor: 'rgba(0, 0, 0, 0.2)',
+    //   tooltip: {
+    //     followMode: 'tracking',
+    //   },
+    // });
+    // candleSeries.attachPrimitive(tooltipPrimitive);
+
+    const volumeSeriesView = new StackedBarsSeries();
+    const volumeSeries = chart.addCustomSeries(volumeSeriesView, {
+      color: 'black',
+      priceScaleId: '',
+      priceFormat: { type: 'volume' },
+    });
+    const stackedDataSource1: StackedBarsData[] = volumeData1.map(d => ({ time: d.time, values: [d.value] }))
+    const stackedDataSource2: StackedBarsData[] = volumeData2.map(d => ({ time: d.time, values: [d.value] }))
+    const stackedData = stackedDataSource1.map(d => ({ time: d.time, values: [d.values[0], stackedDataSource2.find(d2 => d2.time === d.time)!.values[0]] }))
+    const data: (StackedBarsData)[] = stackedData;
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
     })
-  }, [allData, ammData, chartType, clobData])
+    volumeSeries.setData(data);
+
+    return () => {
+      chart.remove();
+    };
+  }, [allData, ammData, clobData, chartType])
 
   return (
     <>
@@ -211,8 +213,7 @@ function App() {
           const counter = getAssetName(pool.Asset2Name, pool.Asset2)
           const base = getAssetName(pool.AssetName, pool.Asset)
           return <option key={pool.index} value={index}>{counter}/{base}</option>
-        }
-        )}
+        })}
       </select>
       <select className='select select-bordered max-w-xs text-xl' value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
         <option value="ALL">ALL</option>
@@ -220,11 +221,27 @@ function App() {
         <option value="CLOB">CLOB</option>
       </select>
       {
-        chartData ?
-          <ZingChart id="chart" width={1280} height={600} data={chartData} /> :
-          <div className='w-[1280px] h-[600px] flex align-center justify-center'>
-            <span className="loading loading-bars loading-lg" />
-          </div>
+        (!loading && ammData.length && clobData.length)
+          ? (
+            <div className="flex flex-col items-center">
+              <div ref={chartContainerRef} className="w-[1280px] h-[600px]" />
+              <div className="flex gap-6 mt-4 text-sm">
+                {
+                  [{label: 'AMM Volume', color: '#26a69a'}, {label: 'CLOB Volume', color: '#ff0000'}].map(({label, color}) => (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4" style={{ backgroundColor: color }} />
+                      <span>{label}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )
+          : (
+            <div className='w-[1280px] h-[600px] flex items-center justify-center'>
+              <span className="loading loading-bars loading-lg" />
+            </div>
+          )
       }
     </>
   )
