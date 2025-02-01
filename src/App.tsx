@@ -138,6 +138,10 @@ function App() {
       const clobjson = (await responseCLOB.json()).reverse();
       const alljson = (await responseALL.json()).reverse();
       setLoading(false)
+      if (clobjson.length === 0) {
+        alert('No data found')
+        return
+      }
       setAmmData(ammjson)
       setClobData(clobjson)
       setAllData(alljson)
@@ -356,6 +360,8 @@ function App() {
     setInterval(tempInterval)
   }
 
+  console.log(loading, ammData.length, clobData.length)
+
   return (
     <>
       <h1 className='text-4xl font-semibold my-12'>XRPL AMM/CLOB Chart</h1>
@@ -397,7 +403,7 @@ function App() {
         </button>
       </div>
       {
-        (!loading && ammData.length && clobData.length)
+        (!loading)
           ? (
             <div className="flex flex-col items-center gap-12">
               <div className="flex flex-col items-center">
