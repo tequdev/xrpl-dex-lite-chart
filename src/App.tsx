@@ -1,14 +1,58 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import './App.css'
 
-import { CandlestickSeries, createChart, UTCTimestamp, LineSeries } from 'lightweight-charts';
-import { Currency } from 'xrpl';
+import { CandlestickSeries, createChart, UTCTimestamp, LineSeries, HistogramSeries } from 'lightweight-charts';
+import { Currency, IssuedCurrency, IssuedCurrencyAmount } from 'xrpl';
 import { StackedBarsSeries } from './plugins/stacked-bars-series/stacked-bars-series';
 import { StackedBarsData } from './plugins/stacked-bars-series/data';
 // import { TooltipPrimitive } from './plugins/tooltip/tooltip';
 
 type ChartType = 'ALL' | 'AMM' | 'CLOB'
 type IntervalType = '1d' | '12h' | '8h' | '4h' | '1h' | '30m' | '15m' | '5m' | '1m'
+
+interface PoolData {
+  Account: string
+  Asset: Currency
+  Asset2: IssuedCurrency
+  AuctionSlot?: {
+    Account: string
+    DiscountedFee: number
+    Expiration: number
+    Price: IssuedCurrencyAmount
+  },
+  Flags: number
+  LPTokenBalance: IssuedCurrencyAmount,
+  OwnerNode: string
+  TradingFee: number
+  VoteSlots: {
+    VoteEntry: {
+      Account: string
+      TradingFee: number
+      VoteWeight: number
+    }
+  }[]
+  index: string
+  Balance: number
+  updated_at: string // "2025-02-01T13:40:17.392Z"
+  PreviousTxnID: string
+  PreviousTxnLgrSeq: number
+  AssetName: {
+    name: string
+    desc: string
+    account: string
+    domain: string
+    twitter: string
+    verified: boolean
+  } | null
+  Asset2Name: {
+    name: string
+    desc: string
+    account: string
+    domain: string
+    twitter: string
+    verified: boolean
+  } | null
+}
 
 type MarketData = {
   timestamp: string;
@@ -30,7 +74,7 @@ const getAssetName = (AssetName: any, Asset: any) => {
 
 function App() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pools, setPools] = useState<any[]>([])
+  const [pools, setPools] = useState<PoolData[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [selectedPool, setSelectedPool] = useState<number>(0)
   const [pair, setPair] = useState<Record<'base' | 'counter', string> & Record<'baseInfo' | 'counterInfo', { name: string }>>()
@@ -39,15 +83,17 @@ function App() {
   const [clobData, setClobData] = useState<MarketData[]>([])
   const [allData, setAllData] = useState<MarketData[]>([])
   const [interval, setInterval] = useState<IntervalType>('8h')
+  const [tempPool, setTempPool] = useState<number>(0)
+  const [tempChartType, setTempChartType] = useState<ChartType>('ALL')
+  const [tempInterval, setTempInterval] = useState<IntervalType>('8h')
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const f = async () => {
       const response = await fetch('https://api.xrpscan.com/api/v1/amm/pools')
-      const data = await response.json()
+      const data = await response.json() as PoolData[]
       const p = data.filter((d) => (!d.Asset.issuer || d.AssetName) && (!d.Asset2.issuer || d.Asset2Name))
-      console.log(p)
       setPools(p)
     }
     f()
@@ -91,10 +137,10 @@ function App() {
       const ammjson = (await responseAMM.json()).reverse();
       const clobjson = (await responseCLOB.json()).reverse();
       const alljson = (await responseALL.json()).reverse();
+      setLoading(false)
       setAmmData(ammjson)
       setClobData(clobjson)
       setAllData(alljson)
-      setLoading(false)
     }
     fetchChartData()
   }, [pair, interval])
@@ -233,6 +279,15 @@ function App() {
       };
     });
 
+    const volumeData = ammData.map((item) => {
+      const clob = clobData.find(d => d.timestamp === item.timestamp)!;
+      const timeSeconds = Math.floor(new Date(item.timestamp).getTime() / 1000);
+      return {
+        time: timeSeconds as UTCTimestamp,
+        value: item.base_volume + clob.base_volume,
+      };
+    });
+
     priceCompareChartRef.current.innerHTML = '';
 
     const priceCompareChart = createChart(priceCompareChartRef.current, {
@@ -252,7 +307,7 @@ function App() {
       rightPriceScale: {
         scaleMargins: {
           top: 0.1,
-          bottom: 0.1,
+          bottom: 0.2,
         },
       },
     });
@@ -280,32 +335,66 @@ function App() {
     });
     clobPriceSeries.setData(clobPriceData);
 
+    const volumeSeries = priceCompareChart.addSeries(HistogramSeries, {
+      color: 'black',
+      priceScaleId: 'left',
+      priceFormat: { type: 'volume' },
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    })
+    volumeSeries.setData(volumeData);
+
     return () => {
       priceCompareChart.remove();
     };
   }, [ammData, clobData]);
 
+  const handleSearch = () => {
+    setSelectedPool(tempPool)
+    setChartType(tempChartType)
+    setInterval(tempInterval)
+  }
+
   return (
     <>
       <h1 className='text-4xl font-semibold my-12'>XRPL AMM/CLOB Chart</h1>
       <div className="flex justify-center gap-4 mb-4">
-        <select className='select select-bordered max-w-xs text-xl' value={selectedPool.toString()} onChange={(e) => setSelectedPool(parseInt(e.target.value))}>
+        <select
+          className='select select-bordered max-w-xs text-xl'
+          value={tempPool.toString()}
+          onChange={(e) => setTempPool(parseInt(e.target.value))}
+        >
           {pools.map((pool, index) => {
             const counter = getAssetName(pool.Asset2Name, pool.Asset2)
             const base = getAssetName(pool.AssetName, pool.Asset)
             return <option key={pool.index} value={index}>{counter}/{base}</option>
           })}
         </select>
-        <select className='select select-bordered max-w-xs text-xl' value={chartType} onChange={(e) => setChartType(e.target.value as ChartType)}>
+        <select
+          className='select select-bordered max-w-xs text-xl'
+          value={tempChartType}
+          onChange={(e) => setTempChartType(e.target.value as ChartType)}
+        >
           <option value="ALL">ALL</option>
           <option value="AMM">AMM</option>
           <option value="CLOB">CLOB</option>
         </select>
-        <select className='select select-bordered max-w-xs text-xl' value={interval} onChange={(e) => setInterval(e.target.value as IntervalType)}>
+        <select
+          className='select select-bordered max-w-xs text-xl'
+          value={tempInterval}
+          onChange={(e) => setTempInterval(e.target.value as IntervalType)}
+        >
           {['1d', '8h', '3h', '1h', '15m', '5m', '1m'].map((interval) => (
             <option key={interval} value={interval}>{interval}</option>
           ))}
         </select>
+        <button
+          className="btn btn-primary text-xl px-8"
+          onClick={handleSearch}
+        >
+          Search
+        </button>
       </div>
       {
         (!loading && ammData.length && clobData.length)
@@ -315,7 +404,7 @@ function App() {
                 <div ref={chartContainerRef} className="w-[1280px] h-[600px]" />
                 <div className="w-[1280px] flex justify-end gap-6 mt-4 text-sm">
                   {
-                    [{label: 'AMM Volume', color: '#26a69a'}, {label: 'CLOB Volume', color: '#ff0000'}].map(({label, color}) => (
+                    [{ label: 'AMM Volume', color: '#2962FF' }, { label: 'CLOB Volume', color: '#E1575A' }].map(({ label, color }) => (
                       <div key={label} className="flex items-center gap-2">
                         <div className="w-4 h-4" style={{ backgroundColor: color }} />
                         <span>{label}</span>
@@ -329,7 +418,7 @@ function App() {
                 <div ref={priceCompareChartRef} className="w-[1280px] h-[400px]" />
                 <div className="w-[1280px] flex justify-end gap-6 mt-4 text-sm">
                   {
-                    [{label: 'AMM Price', color: '#26a69a'}, {label: 'CLOB Price', color: '#ff0000'}].map(({label, color}) => (
+                    [{ label: 'AMM Price', color: '#26a69a' }, { label: 'CLOB Price', color: '#ff0000' }, { label: 'Volume', color: 'black' }].map(({ label, color }) => (
                       <div key={label} className="flex items-center gap-2">
                         <div className="w-4 h-4" style={{ backgroundColor: color }} />
                         <span>{label}</span>
