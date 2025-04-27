@@ -218,15 +218,7 @@ function App() {
     });
 
     chart.applyOptions({
-      localization: {
-        dateFormat: 'dd MMM \'yy'
-      },
-    });
-    chart.applyOptions({
-      localization: {
-        locale: 'ja-JP',
-        dateFormat: 'yyyy-MM-dd',
-      },
+      localization: {},
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries)
@@ -317,10 +309,7 @@ function App() {
     });
 
     priceCompareChart.applyOptions({
-      localization: {
-        locale: 'ja-JP',
-        dateFormat: 'yyyy-MM-dd',
-      },
+      localization: {},
     });
 
     // AMM価格ライン
