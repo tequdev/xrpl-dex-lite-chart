@@ -432,9 +432,9 @@ function App() {
       }
       <footer className='text-center text-sm mt-12'>
         <span>
-          Powered by API data from &nbsp;
+          Powered by API data from&nbsp;
           <a href="https://docs.xrpscan.com/api-documentation/introduction" target='_blank' rel='noopener noreferrer'>XRPScan</a>
-          &nbsp; and &nbsp;
+          &nbsp;and&nbsp;
           <a href="https://data.xrplf.org/docs" target='_blank' rel='noopener noreferrer'>InFTF</a>.
         </span>
       </footer>
