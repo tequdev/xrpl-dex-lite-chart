@@ -130,9 +130,10 @@ function App() {
       if (!pair) return
       const { base, counter } = pair
       setLoading(true)
-      const responseAMM = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&only_amm=true`);
-      const responseCLOB = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&exclude_amm=true`);
-      const responseALL = await fetch(`https://data.xrplf.org/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true`);
+      const baseUrl = 'https://data.xrplf.org'
+      const responseAMM = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&only_amm=true`);
+      const responseCLOB = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&exclude_amm=true`);
+      const responseALL = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true`);
 
       const ammjson = (await responseAMM.json()).reverse();
       const clobjson = (await responseCLOB.json()).reverse();
@@ -435,7 +436,7 @@ function App() {
           Powered by API data from&nbsp;
           <a href="https://docs.xrpscan.com/api-documentation/introduction" target='_blank' rel='noopener noreferrer'>XRPScan</a>
           &nbsp;and&nbsp;
-          <a href="https://data.xrplf.org/docs" target='_blank' rel='noopener noreferrer'>InFTF</a>.
+          <a href="https://xrpldata.inftf.org/docs" target='_blank' rel='noopener noreferrer'>InFTF</a>.
         </span>
       </footer>
     </>
