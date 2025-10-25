@@ -130,7 +130,7 @@ function App() {
       if (!pair) return
       const { base, counter } = pair
       setLoading(true)
-      const baseUrl = 'https://data.xrplf.org'
+      const baseUrl = 'https://xrpldata.inftf.org'
       const responseAMM = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&only_amm=true`);
       const responseCLOB = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true&exclude_amm=true`);
       const responseALL = await fetch(`${baseUrl}/v1/iou/market_data/${base}/${counter}?interval=${interval}&limit=321&descending=true`);
